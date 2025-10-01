@@ -1,0 +1,277 @@
+{
+  "name": "Charney Commission Email Parser",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "mailbox": "INBOX",
+        "postProcessAction": "mark",
+        "options": {
+          "allowUnauthorizedCerts": false,
+          "forceReconnect": false
+        }
+      },
+      "name": "Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "credentials": {
+        "imap": {
+          "id": "1",
+          "name": "IMAP account"
+        }
+      },
+      "notes": "Configure your email credentials here. Checks for new emails every minute."
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract email content and metadata\nconst item = $input.item.json;\n\n// Get email content (prefer plain text, fallback to HTML)\nconst emailContent = item.text || item.textAsHtml || item.html || '';\n\n// Get subject\nconst emailSubject = item.subject || 'No Subject';\n\n// Get sender email\nlet emailSource = '';\nif (item.from) {\n  if (typeof item.from === 'string') {\n    emailSource = item.from;\n  } else if (item.from.address) {\n    emailSource = item.from.address;\n  } else if (item.from.value && item.from.value[0]) {\n    emailSource = item.from.value[0].address;\n  }\n}\n\n// Prepare payload for Commission API\nreturn {\n  json: {\n    email_content: emailContent,\n    email_subject: emailSubject,\n    email_source: emailSource,\n    // Keep original email data for reference\n    _original: {\n      date: item.date,\n      messageId: item.messageId\n    }\n  }\n};"
+      },
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "notes": "Extracts email content, subject, and sender information"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5000/api/v1/parse",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"email_content\": \"{{ $json.email_content }}\",\n  \"email_subject\": \"{{ $json.email_subject }}\",\n  \"email_source\": \"{{ $json.email_source }}\"\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "name": "Parse Commission",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "notes": "Sends email to Commission Tracker API for AI parsing. Change URL if API is on different host/port."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Parsing Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "notes": "Check if API successfully parsed the email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.validation.confidence_score }}",
+              "operation": "largerEqual",
+              "value2": 0.7
+            }
+          ]
+        }
+      },
+      "name": "High Confidence?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1120, 200],
+      "notes": "Check if AI confidence score is >= 0.7 (70%)"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format success message\nconst data = $json.data;\nconst validation = $json.validation;\n\nconst message = `✅ Commission Processed Successfully!\n\n📋 Transaction Details:\n• Transaction ID: ${data.transaction_id}\n• Property: ${data.property_address}\n• Sale Amount: $${data.sale_amount.toLocaleString()}\n• Commission Rate: ${(data.commission_rate * 100).toFixed(1)}%\n• Total Commission: $${data.total_commission.toLocaleString()}\n• Closing Date: ${data.closing_date}\n• Status: ${data.status}\n\n👥 Commission Splits:\n${data.splits.map(s => `• ${s.agent_name}: ${(s.percentage * 100).toFixed(0)}% = $${s.amount.toLocaleString()}`).join('\\n')}\n\n📊 AI Confidence: ${(validation.confidence_score * 100).toFixed(1)}%\n\n✨ Ready for verification!`;\n\nreturn {\n  json: {\n    message: message,\n    transaction_id: data.transaction_id,\n    total_commission: data.total_commission,\n    confidence_score: validation.confidence_score\n  }\n};"
+      },
+      "name": "Format Success Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1340, 100],
+      "notes": "Creates a formatted success notification"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format low confidence alert\nconst data = $json.data;\nconst validation = $json.validation;\n\nconst message = `⚠️ Low Confidence Commission - Manual Review Needed\n\n📋 Transaction Details:\n• Transaction ID: ${data.transaction_id}\n• Property: ${data.property_address}\n• Total Commission: $${data.total_commission.toLocaleString()}\n\n⚠️ Issues:\n• AI Confidence: ${(validation.confidence_score * 100).toFixed(1)}% (below 70% threshold)\n${validation.warnings.length > 0 ? '• Warnings: ' + validation.warnings.join(', ') : ''}\n${validation.errors.length > 0 ? '• Errors: ' + validation.errors.join(', ') : ''}\n\n👉 Action Required:\nPlease review this commission manually in the system.\n\nView: http://localhost:5000/api/v1/commissions/${data.id}`;\n\nreturn {\n  json: {\n    message: message,\n    transaction_id: data.transaction_id,\n    confidence_score: validation.confidence_score,\n    requires_review: true\n  }\n};"
+      },
+      "name": "Format Low Confidence Alert",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "notes": "Creates alert for low confidence scores"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format error message\nconst error = $json.error || 'Unknown error';\nconst message = $json.message || 'No details available';\n\nconst errorMsg = `❌ Commission Parsing Failed\n\n🔴 Error: ${error}\n📝 Details: ${message}\n\n📧 Original Email:\n• Subject: ${$node[\"Extract Email Data\"].json.email_subject}\n• From: ${$node[\"Extract Email Data\"].json.email_source}\n\n👉 Action Required:\nPlease check the email format and try again, or process manually.\n\nAPI Logs: Check logs/app.log for details`;\n\nreturn {\n  json: {\n    message: errorMsg,\n    error: error,\n    failed: true\n  }\n};"
+      },
+      "name": "Format Error Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1120, 400],
+      "notes": "Creates error notification"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 100],
+      "notes": "Replace with Slack/Email/Teams notification node"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Log Low Confidence",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "notes": "Replace with Slack/Email/Teams notification node"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.message }}",
+        "options": {}
+      },
+      "name": "Log Error",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 500],
+      "notes": "Replace with Slack/Email/Teams notification node"
+    }
+  ],
+  "connections": {
+    "Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "Parse Commission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Commission": {
+      "main": [
+        [
+          {
+            "node": "Parsing Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsing Successful?": {
+      "main": [
+        [
+          {
+            "node": "High Confidence?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Confidence?": {
+      "main": [
+        [
+          {
+            "node": "Format Success Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Low Confidence Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success Message": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Low Confidence Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Low Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Message": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+
