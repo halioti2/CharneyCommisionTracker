@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clarity - Charney Commission Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --charney-red: #FF5959;
+            --charney-black: #000000;
+            --charney-cream: #F6F1EB;
+            --charney-white: #FFFFFF;
+            --charney-gray: #666666;
+            --charney-light-gray: #E5E5E5;
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        html.dark {
+            --charney-black: #F6F1EB; /* Text becomes cream */
+            --charney-cream: #1a1a1a; /* Main background becomes dark */
+            --charney-white: #2a2a2a; /* Card background becomes lighter dark */
+            --charney-gray: #999999; /* Gray becomes lighter */
+            --charney-light-gray: #444444; /* Light gray becomes darker */
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        body {
+            font-family: 'Franklin Gothic', 'Arial Narrow', Arial, sans-serif;
+            background-color: var(--charney-cream);
+            color: var(--charney-black);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Typography Overrides */
+        h1, h2, h3, h4, .font-brand {
+            font-family: 'Franklin Gothic', 'Arial Narrow', Arial, sans-serif;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+        .text-charney-red { color: var(--charney-red); }
+        .bg-charney-red { background-color: var(--charney-red); }
+
+        /* Component Styling */
+        .header {
+            background-color: var(--charney-cream);
+            border-bottom: 6px solid var(--charney-red);
+        }
+        .card {
+            background-color: var(--charney-white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+        }
+        .key-metric-card {
+             border-top: 6px solid var(--charney-red);
+        }
+        
+        .btn {
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 12px 28px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: var(--charney-red);
+            color: var(--charney-white);
+        }
+        html.dark .btn-primary {
+            color: #000;
+        }
+        .btn-primary:hover {
+            background: #E54545;
+            transform: translateY(-1px);
+        }
+         .btn-outline {
+            background: transparent;
+            color: var(--charney-black);
+            border: 3px solid var(--charney-black);
+        }
+        .btn-outline:hover {
+            background: var(--charney-black);
+            color: var(--charney-white);
+        }
+        html.dark .btn-outline:hover {
+            color: var(--charney-cream);
+            background: var(--charney-light-gray);
+        }
+        
+        /* View Toggle */
+        .view-toggle button.active {
+            color: var(--charney-red);
+        }
+        
+        /* Panel & Modal */
+        .panel, .modal-content, #trid-modal {
+            background-color: var(--charney-white);
+            color: var(--charney-black);
+        }
+        .panel { transform: translateX(100%); transition: transform 0.3s ease-in-out; }
+        .panel.is-open { transform: translateX(0); }
+        .panel-overlay { transition: opacity 0.3s ease-in-out; }
+        .log-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+        .log-item.expanded .log-body { max-height: 500px; }
+        .log-header .arrow { transition: transform 0.3s ease-in-out; }
+        .log-item.expanded .arrow { transform: rotate(90deg); }
+        .panel-nav button.active { border-bottom-color: var(--charney-red); }
+
+        /* Table */
+        table thead th {
+            background-color: var(--charney-black);
+            color: var(--charney-white);
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        html.dark table thead th {
+            background-color: var(--charney-light-gray);
+            color: var(--charney-cream);
+        }
+        table td {
+             border-bottom: 1px solid var(--charney-light-gray);
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Form Inputs */
+        .form-input {
+            width: 100%;
+            background-color: var(--charney-cream);
+            border: 2px solid var(--charney-light-gray);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 1rem;
+            color: var(--charney-black);
+            transition: border-color 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--charney-red);
+        }
+        html.dark .form-input {
+             background-color: #333;
+             border-color: #555;
+             color: var(--charney-black);
+        }
+        .form-label {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--charney-gray);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        /* Stock Ticker Styles */
+        #stock-ticker-container {
+            -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0));
+            mask-image: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,0));
+        }
+        #stock-ticker-track {
+            white-space: nowrap;
+            will-change: transform;
+            animation: scroll 40s linear infinite;
+        }
+        @keyframes scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .ticker-item {
+            display: inline-block;
+            padding: 0 1.5rem;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        .ticker-up { color: #16a34a; }
+        .ticker-down { color: #dc2626; }
+
+        /* Market Alert Styles */
+        .market-alert {
+            transition: opacity 0.3s ease;
+        }
+
+        /* Print styles */
+        @media print {
+            body * { visibility: hidden; }
+            #trid-form-printable, #trid-form-printable * { visibility: visible; }
+            #trid-form-printable { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
+            input { border: none !important; -webkit-appearance: none; background: transparent !important; color: black !important; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="flex flex-col h-screen">
+        <header class="header px-4 md:px-6 py-4 flex items-center justify-between flex-shrink-0 z-20 no-print">
+            <div class="flex items-center space-x-3">
+                 <svg width="28" height="28" viewBox="0 0 24 24" class="text-charney-black" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2ZM12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4Z"/><path d="M12 6C11.4477 6 11 6.44772 11 7V11H7C6.44772 11 6 11.4477 6 12C6 12.5523 6.44772 13 7 13H11V17C11 17.5523 11.4477 18 12 18C12.5523 18 13 17.5523 13 17V7C13 6.44772 12.5523 6 12 6Z"/></svg>
+                 <h1 class="text-2xl font-black uppercase tracking-tighter">Clar<span class="text-charney-red">i</span>ty</h1>
+            </div>
+            <div class="view-toggle flex items-center space-x-2">
+                <button id="toggle-broker" class="font-bold uppercase text-sm">Broker</button>
+                <span class="text-charney-gray">/</span>
+                <button id="toggle-coordinator" class="font-bold uppercase text-sm">Coordinator</button>
+            </div>
+            <div class="flex items-center space-x-4">
+                 <button id="theme-toggle" class="p-2 rounded-full hover:bg-black/10 dark:hover:bg-white/10 focus:outline-none">
+                    <svg id="theme-icon-light" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                    <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.121-3.536a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM10 16a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM3.05 4.536a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zm1.414 10.434l.707-.707a1 1 0 10-1.414-1.414l-.707.707a1 1 0 001.414 1.414zM2 10a1 1 0 011-1h1a1 1 0 110 2H3a1 1 0 01-1-1zm14-4.95l-.707-.707a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+                <span id="user-name" class="text-sm font-bold uppercase"></span>
+                <img id="user-avatar" class="h-9 w-9 rounded-full object-cover border-2 border-charney-black dark:border-charney-cream" src="" alt="User Avatar">
+            </div>
+        </header>
+        
+        <main class="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+            <!-- Broker View -->
+            <div id="broker-view" class="hidden">
+                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                            <div class="card key-metric-card p-5"><h3 class="text-sm font-bold text-charney-gray uppercase tracking-wider">Commissions Paid (YTD)</h3><p class="text-4xl font-black mt-2">$2.85M</p></div>
+                            <div class="card key-metric-card p-5"><h3 class="text-sm font-bold text-charney-gray uppercase tracking-wider">Leases Signed (YTD)</h3><p class="text-4xl font-black mt-2">840</p></div>
+                            <div class="card key-metric-card p-5"><h3 class="text-sm font-bold text-charney-gray uppercase tracking-wider">Avg Commission %</h3><p class="text-4xl font-black mt-2">14.8%</p></div>
+                            <div class="card key-metric-card p-5"><h3 class="text-sm font-bold text-charney-gray uppercase tracking-wider">Active Agents</h3><p class="text-4xl font-black mt-2">45</p></div>
+                        </div>
+                        <div class="card p-5"><h3 class="text-2xl font-black mb-4 tracking-tighter">Agent <span class="text-charney-red">Performance</span></h3><div id="top-performers-table-container"><table id="top-performers-table" class="w-full text-sm text-left"><thead class="text-xs uppercase"><tr><th class="p-4">Agent</th><th class="p-4 text-center">GCI (YTD)</th><th class="p-4 text-center">Avg. Deal Time</th><th class="p-4 text-center">Score</th><th class="p-4 text-center">Disclosure Status</th></tr></thead><tbody></tbody></table></div></div>
+                    </div>
+                    <div class="lg:col-span-1 space-y-8">
+                        <div class="card p-6"><h3 class="text-2xl font-black mb-4 tracking-tighter">Commission <span class="text-charney-red">Forecast</span></h3><canvas id="commissionForecasterChart"></canvas></div>
+                        <div class="card p-4">
+                            <h3 class="text-lg font-black mb-3 tracking-tighter">Market <span class="text-charney-red">Pulse</span></h3>
+                            <div id="stock-ticker-container" class="relative flex overflow-x-hidden">
+                                <div id="stock-ticker-track" class="flex">
+                                    <!-- Ticker items will be injected here by JS -->
+                                </div>
+                            </div>
+                        </div>
+                        <div id="market-alerts-container" class="space-y-4">
+                            <!-- Market alerts will be injected here by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coordinator View -->
+            <div id="coordinator-view" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                    <div class="lg:col-span-3 space-y-8">
+                        <div class="card p-6">
+                            <h3 class="text-2xl font-black mb-4 tracking-tighter">Today's <span class="text-charney-red">Focus</span></h3>
+                            <div class="space-y-4">
+                                <div class="flex justify-between items-center"><p>New Since Last Login</p><p class="text-2xl font-black text-charney-red">7</p></div>
+                                <div class="flex justify-between items-center"><p>Awaiting Information</p><p class="text-2xl font-black">8</p></div>
+                                <div class="flex justify-between items-center"><p>Requires Attention (48hr+)</p><p class="text-2xl font-black">3</p></div>
+                            </div>
+                        </div>
+                        <div class="card p-6"><h3 class="text-2xl font-black mb-4 tracking-tighter">Commission <span class="text-charney-red">Queue</span></h3><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="text-xs uppercase"><tr><th class="p-4">Agent</th><th class="p-4">Property</th><th class="p-4">Total Commission</th><th class="p-4">Status</th></tr></thead><tbody id="commission-table-body"></tbody></table></div></div>
+                    </div>
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="card p-6">
+                             <h3 class="text-2xl font-black mb-4 tracking-tighter">Your <span class="text-charney-red">Journey</span></h3>
+                             <div>
+                                <h4 class="font-bold uppercase text-sm mb-2">Progress to 70/30 Split</h4>
+                                <div class="w-full bg-charney-light-gray rounded-full h-3 mb-2"><div class="bg-charney-red h-3 rounded-full" style="width: 78.75%"></div></div>
+                                <p class="text-right font-bold text-sm">$42,500 <span class="text-charney-gray font-normal">Remaining</span></p>
+                             </div>
+                        </div>
+                         <div class="card p-6">
+                             <h3 id="performance-chart-title" class="text-2xl font-black mb-4 tracking-tighter">Weekly <span class="text-charney-red">Volume</span></h3>
+                             <div class="relative h-64"><canvas id="myPerformanceChart"></canvas></div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals and Panels -->
+    <div id="panel-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-30 panel-overlay"></div>
+    <div id="broker-panel" class="panel fixed top-0 right-0 h-full w-full max-w-2xl p-6 overflow-y-auto z-40">
+        <div class="flex justify-between items-center mb-6">
+            <h3 id="panel-agent-name" class="text-2xl font-black uppercase tracking-tighter">Agent Details</h3>
+            <button id="close-panel-btn" class="opacity-70 hover:opacity-100 text-3xl">&times;</button>
+        </div>
+        <div class="panel-nav flex border-b-2 border-charney-light-gray mb-6">
+            <button class="panel-nav-btn active py-2 px-4 text-sm font-bold uppercase border-b-4 border-transparent" data-panel="history">Transaction History</button>
+            <button class="panel-nav-btn py-2 px-4 text-sm font-bold uppercase border-b-4 border-transparent" data-panel="plan">Commission Plan</button>
+        </div>
+        <div id="panel-history-content" class="panel-content">
+             <p><strong>Contact:</strong> <a id="panel-agent-email" href="#" class="text-charney-red hover:underline"></a></p>
+             <p><strong>Performance Score:</strong> <span id="panel-agent-score" class="font-bold text-charney-red"></span></p>
+             <h4 class="font-bold uppercase pt-4 border-t border-charney-light-gray mt-4">Transactions</h4>
+             <div id="panel-history" class="space-y-4 mt-2"></div>
+        </div>
+        <div id="panel-plan-content" class="panel-content hidden space-y-8">
+            <div class="card p-6">
+                <h4 class="text-xl font-black mb-4 tracking-tighter">Primary <span class="text-charney-red">Split & Cap</span></h4>
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="form-label" for="agent-split">Agent Split (%)</label>
+                        <input id="agent-split" type="number" class="form-input" value="70">
+                    </div>
+                     <div>
+                        <label class="form-label" for="brokerage-split">Brokerage Split (%)</label>
+                        <input id="brokerage-split" type="number" class="form-input" value="30" disabled>
+                    </div>
+                </div>
+                 <div class="mt-6">
+                    <label class="form-label" for="commission-cap">Annual Commission Cap ($)</label>
+                    <input id="commission-cap" type="number" class="form-input" value="20000">
+                </div>
+                <div class="mt-4">
+                     <h4 class="font-bold uppercase text-sm mb-2">Progress to Cap</h4>
+                     <div class="w-full bg-charney-light-gray rounded-full h-3 mb-1"><div id="cap-progress-bar" class="bg-charney-red h-3 rounded-full"></div></div>
+                     <p id="cap-progress-text" class="text-right font-bold text-sm"></p>
+                </div>
+                 <div class="mt-6 pt-4 border-t border-charney-light-gray">
+                    <h4 class="text-sm font-bold uppercase text-charney-gray tracking-wider mb-2">Standard Deductions (Fixed)</h4>
+                    <div class="text-sm space-y-1 text-charney-gray">
+                        <p><strong>Franchise Fee:</strong> <span id="display-franchise-fee"></span>%</p>
+                        <p><strong>E&O Insurance:</strong> $<span id="display-eo-fee"></span></p>
+                        <p><strong>Transaction Fee:</strong> $<span id="display-transaction-fee"></span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="text-right">
+                <button id="save-plan-btn" class="btn btn-primary">Save Plan</button>
+            </div>
+        </div>
+    </div>
+    <div id="commission-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 no-print">
+        <div class="modal-content rounded-lg shadow-xl w-full max-w-6xl">
+            <div class="p-5 border-b border-charney-light-gray flex justify-between items-center"><h3 class="text-xl font-black uppercase">Commission Detail</h3><button class="close-modal opacity-70 hover:opacity-100 text-2xl">&times;</button></div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 max-h-[70vh] overflow-y-auto">
+                <div id="source-document-view" class="space-y-4 md:col-span-1"></div>
+                <div id="calculation-view" class="space-y-4 md:col-span-2"></div>
+            </div>
+            <div class="p-5 border-t border-charney-light-gray flex justify-between items-center"><button id="generate-trid-btn" class="hidden btn btn-outline">Generate Disclosure</button><div id="modal-actions" class="flex items-center space-x-3 ml-auto"></div></div>
+        </div>
+    </div>
+    <div id="trid-modal" class="hidden fixed inset-0 p-8 overflow-y-auto z-[60]"></div>
+    <div id="success-notification" class="hidden fixed top-5 right-5 bg-yellow-400 text-red-700 px-6 py-3 rounded-md shadow-lg z-50 font-bold uppercase text-sm"></div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        let commissionForecasterChart, myPerformanceChart;
+
+        // --- Data Model ---
+        const agentPlans = {
+            "Jessica Wong": { primarySplit: { agent: 70, brokerage: 30 }, commissionCap: 20000, currentTowardsCap: 15500, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "Sarah Klein": { primarySplit: { agent: 80, brokerage: 20 }, commissionCap: 25000, currentTowardsCap: 18000, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "Michael B.": { primarySplit: { agent: 60, brokerage: 40 }, commissionCap: 18000, currentTowardsCap: 5000, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "David Chen": { primarySplit: { agent: 90, brokerage: 10 }, commissionCap: 30000, currentTowardsCap: 29000, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "Emily White": { primarySplit: { agent: 75, brokerage: 25 }, commissionCap: 22000, currentTowardsCap: 10000, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "James Riley": { primarySplit: { agent: 70, brokerage: 30 }, commissionCap: 20000, currentTowardsCap: 19500, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+            "Maria Garcia": { primarySplit: { agent: 65, brokerage: 35 }, commissionCap: 19000, currentTowardsCap: 12000, deductions: { franchiseFeePct: 6, eoFee: 150, transactionFee: 450 } },
+        };
+        const mockData = Array.from({ length: 50 }, (_, i) => { const brokers = ["Jessica Wong", "Sarah Klein", "Michael B.", "David Chen", "Emily White", "James Riley", "Maria Garcia"]; const properties = ["123 Main St", "The Dime", "53 Broadway", "420 Kent Ave", "111 Varick"]; const salePrice = 1000000 + Math.random() * 2000000; const buyer = ["Jane Doe", "John Smith", "Peter Jones", "Mary Williams", "Susan Brown"][i%5]; const seller = ["Emily Davis", "Michael Miller", "David Wilson", "Sarah Moore", "James Taylor"][i%5]; const attachments = [["Purchase_Offer.pdf", "Property_Photos.zip", "Floor_Plan.pdf"], ["Signed_Comm_Agreement.docx", "Wire_Instructions.pdf", "Client_ID.jpeg"], ["Inspection_Report.pdf", "ID_Scan.jpeg", "Loan_Approval.pdf", "Bank_Statement.pdf", "Title_Report.pdf"]]; const bankInfo = ["Bank of America, Acct: ...1122", "CitiBank, Acct: ...3344", "Wells Fargo, Acct: ...5566"]; const email = `${brokers[i % brokers.length].toLowerCase().replace(/\s/g, '.')}@example.com`; const dealTime = 5 + Math.floor(Math.random() * 10); const accuracy = 90 + Math.floor(Math.random() * 10); const conflict = i < 3; const finalSalePrice = conflict ? salePrice * 1.05 : salePrice; let status = ['Needs Review', 'Approved', 'Paid', 'Awaiting Info'][i % 4]; if (conflict) status = 'Needs Review'; return { id: `C10${i+1}`, broker: brokers[i % brokers.length], email: email, property: `${properties[i % properties.length]}, Unit ${10 + i}A`, salePrice: finalSalePrice, grossCommissionRate: 2.5, referralFeePct: i % 5 === 0 ? 25 : 0, dealTime: dealTime, accuracy: accuracy, score: Math.round((finalSalePrice/3000000)*40 + (1 - dealTime/15)*30 + (accuracy/100)*30), conflict: conflict, status: status, disclosureViewed: i > 2, parsedData: { propertyAddress: `${properties[i % properties.length]}, Brooklyn, NY`, buyerName: buyer, sellerName: seller, salePrice: finalSalePrice, loanAmount: finalSalePrice * 0.8, listingSideCommission: finalSalePrice * 0.025, sellerConcession: finalSalePrice * 0.02, receivingBrokerage: `${brokers[i % brokers.length]}'s Brokerage`, receivingBankInfo: bankInfo[i % bankInfo.length] }, source: { attachments: attachments[i % attachments.length], content: [{from: brokers[i%brokers.length], to:"Alex", body: `Hey Alex, starting a new deal for ${properties[i % properties.length]}. Attached is the initial <a href="#" class="hover:underline text-charney-red">${attachments[i % attachments.length][0]}</a>. The offer is for <span class='${conflict ? 'bg-yellow-500/30' : ''}'>${salePrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>.`}, {from: "Alex", to: brokers[i % brokers.length], body: `Got it. Looks a bit low. Can they come up?`}, {from: brokers[i%brokers.length], to:"Alex", body: `Okay, they've agreed to <span class='bg-red-500/20'>${finalSalePrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>. Final offer. Also, here is the <a href="#" class="hover:underline text-charney-red">${attachments[i % attachments.length][1]}</a>.`}, {from: "Alex", to: brokers[i % brokers.length], body: `Perfect, that works. Who is the seller?`}, {from: brokers[i%brokers.length], to:"Alex", body: `Seller is <span class='bg-red-500/20'>${seller}</span>. And buyer is <span class='bg-red-500/20'>${buyer}</span>.`}, {from: "Alex", to: brokers[i % brokers.length], body: `Great. Last thing - can you confirm the concession?`}, {from: brokers[i%brokers.length], to:"Alex", body: `Yes, confirmed. <span class='bg-red-500/20'>2% concession</span>. Also sending over the <a href="#" class="hover:underline text-charney-red">${attachments[i % attachments.length][2]}</a>.`}] }, auditTrail: [{category: "Ingestion", actor: "Clarity AI", action: "Commission created from email.", time: "3 days ago"}, {category: "Verification", actor:"Coordinator", action: `Corrected 'Sale Price'.`, time: "2 days ago"}, {category: "Communication", actor:"Coordinator", action: `Requested 'Wire_Instructions.pdf'.`, time: "2 days ago"},{category: "Communication", actor: brokers[i % brokers.length], action: `Uploaded 'Wire_Instructions.pdf'.`, time: "1 day ago"},{category: "Approval", actor:"Coordinator", action: `Approved by Coordinator.`, time: "4 hours ago"}, {category: "Approval", actor:"John Doe", action: `Final approval by Broker.`, time: "1 hour ago"}, {category: "Payment", actor:"System", action: `Payment scheduled.`, time: "30 minutes ago"}] }; });
+
+        // --- Calculation Engine ---
+        function calculateCommission(deal, plan) {
+            const gci = deal.salePrice * (deal.grossCommissionRate / 100);
+            const referralFee = gci * (deal.referralFeePct / 100);
+            const franchiseFee = gci * (plan.deductions.franchiseFeePct / 100);
+            const adjustedGci = gci - referralFee - franchiseFee;
+            
+            const remainingCap = plan.commissionCap - plan.currentTowardsCap;
+            const brokerageSharePreCap = adjustedGci * (plan.primarySplit.brokerage / 100);
+            const brokerageShareToCap = Math.min(remainingCap, brokerageSharePreCap);
+            const agentShare = adjustedGci - brokerageShareToCap;
+            
+            const agentNet = agentShare - plan.deductions.eoFee - plan.deductions.transactionFee;
+            
+            return {
+                gci, referralFee, franchiseFee, adjustedGci, 
+                agentShare, brokerageShareToCap, agentNet,
+                agentSplit: plan.primarySplit.agent,
+                eoFee: plan.deductions.eoFee,
+                transactionFee: plan.deductions.transactionFee
+            };
+        }
+
+        // --- Theme Toggle ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIconLight = document.getElementById('theme-icon-light');
+        const themeIconDark = document.getElementById('theme-icon-dark');
+        const docElement = document.documentElement;
+
+        const applyTheme = (theme) => {
+            if (theme === 'dark') {
+                docElement.classList.add('dark');
+                themeIconLight.classList.add('hidden');
+                themeIconDark.classList.remove('hidden');
+            } else {
+                docElement.classList.remove('dark');
+                themeIconLight.classList.remove('hidden');
+                themeIconDark.classList.add('hidden');
+            }
+            if (commissionForecasterChart) commissionForecasterChart.destroy();
+            if (myPerformanceChart) myPerformanceChart.destroy();
+            
+            if (document.getElementById('broker-view').classList.contains('hidden')) {
+                initCoordinatorCharts();
+            } else {
+                initBrokerCharts();
+            }
+        };
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        applyTheme(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const newTheme = docElement.classList.contains('dark') ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        });
+
+        // --- Elements ---
+        const toggleCoordinator = document.getElementById('toggle-coordinator');
+        const toggleBroker = document.getElementById('toggle-broker');
+        const coordinatorView = document.getElementById('coordinator-view');
+        const brokerView = document.getElementById('broker-view');
+        const userName = document.getElementById('user-name');
+        const userAvatar = document.getElementById('user-avatar');
+        
+        const brokerAvatar = 'https://placehold.co/100x100/000000/FFFFFF?text=JD';
+        const coordinatorAvatar = 'https://placehold.co/100x100/FF5959/000000?text=LC';
+        
+        // --- View Management ---
+        function setView(view) {
+            if (view === 'coordinator') {
+                brokerView.classList.add('hidden');
+                coordinatorView.classList.remove('hidden');
+                toggleCoordinator.classList.add('active', 'text-charney-red');
+                toggleBroker.classList.remove('active', 'text-charney-red');
+                userName.textContent = "Leasing Coordinator";
+                userAvatar.src = coordinatorAvatar;
+                initCoordinatorCharts();
+            } else { 
+                coordinatorView.classList.add('hidden');
+                brokerView.classList.remove('hidden');
+                toggleBroker.classList.add('active', 'text-charney-red');
+                toggleCoordinator.classList.remove('active', 'text-charney-red');
+                userName.textContent = "John Doe";
+                userAvatar.src = brokerAvatar;
+                initBrokerCharts();
+            }
+        }
+        toggleCoordinator.addEventListener('click', () => setView('coordinator'));
+        toggleBroker.addEventListener('click', () => setView('broker'));
+
+        // --- Charting ---
+        function initBrokerCharts() {
+            const forecasterCtx = document.getElementById('commissionForecasterChart')?.getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#999999' : '#666666';
+            const linePrimaryColor = isDark ? '#F6F1EB' : '#000000';
+            if (forecasterCtx) { 
+                if (Chart.getChart(forecasterCtx)) Chart.getChart(forecasterCtx).destroy();
+                commissionForecasterChart = new Chart(forecasterCtx, { type: 'line', data: { labels: ['-90d', '-60d', '-30d', 'Today', '+30d', '+60d', '+90d'], datasets: [{ label: 'Commissions', data: [210, 250, 230, 280, 260, 300, 280], borderColor: linePrimaryColor, tension: 0.4 }, { label: 'Forecast', data: [null, null, null, 280, 260, 300, 280], borderColor: '#FF5959', borderDash: [5, 5], tension: 0.4 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: textColor, callback: (v) => `$${v}k` }, grid: { drawOnChartArea: false } }, x: { ticks: { color: textColor }, grid: { display: false } } } } }); 
+            }
+        }
+        function initCoordinatorCharts() {
+            const myPerformanceCtx = document.getElementById('myPerformanceChart')?.getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#999999' : '#666666';
+            if (myPerformanceCtx) {
+                if (Chart.getChart(myPerformanceCtx)) Chart.getChart(myPerformanceCtx).destroy();
+                myPerformanceChart = new Chart(myPerformanceCtx, { type: 'bar', data: { labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'], datasets: [{ label: 'Commissions Processed', data: [8, 12, 9, 15], backgroundColor: '#FF5959', borderRadius: 4, }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { drawOnChartArea: false }, ticks: {color: textColor} }, x: { grid: { display: false }, ticks: {color: textColor} } } } });
+            }
+        }
+
+        // --- Table Rendering ---
+        function renderTables() {
+            const topPerformersTable = document.getElementById('top-performers-table')?.querySelector('tbody');
+            if (topPerformersTable) {
+                topPerformersTable.innerHTML = ''; 
+                mockData.slice(0, 5).sort((a,b) => b.score - a.score).forEach(d => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-charney-cream/50 dark:hover:bg-charney-cream/10';
+                    row.innerHTML = `<td class="p-4 font-bold cursor-pointer" data-agent-name="${d.broker}">${d.broker}</td><td class="p-4 text-center">${(d.salePrice * (d.grossCommissionRate / 100) / 1000).toFixed(1)}k</td><td class="p-4 text-center">${d.dealTime}d</td><td class="p-4 text-center font-bold text-green-600">${d.score}</td><td class="p-4 text-center"><button data-commission-id="${d.id}" class="view-disclosure-btn text-xs font-bold uppercase px-3 py-1 rounded-sm ${d.disclosureViewed ? 'bg-charney-light-gray text-charney-gray' : 'bg-charney-red text-white dark:text-black'}">${d.disclosureViewed ? 'Viewed' : 'Needs Viewing'}</button></td>`;
+                    topPerformersTable.appendChild(row);
+                });
+            }
+            const commissionTableBody = document.getElementById('commission-table-body');
+            if (commissionTableBody) {
+                commissionTableBody.innerHTML = '';
+                 mockData.forEach(data => { 
+                    const row = document.createElement('tr'); 
+                    row.className = 'review-item hover:bg-charney-cream/50 dark:hover:bg-charney-cream/10 cursor-pointer'; 
+                    row.dataset.commissionId = data.id; 
+                    row.innerHTML = `<td class="p-4 font-bold flex items-center cursor-pointer" data-agent-name="${data.broker}">${data.broker} ${data.conflict ? '<svg class="w-4 h-4 ml-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>' : ''}</td><td class="p-4 text-charney-gray">${data.property}</td><td class="p-4 text-charney-gray">${(data.salePrice * (data.grossCommissionRate / 100)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td><td class="p-4 status-cell">${getStatusBadge(data.status)}</td>`; 
+                    commissionTableBody.appendChild(row); 
+                });
+            }
+        }
+        function getStatusBadge(status) { const colors = { "Needs Review": "bg-yellow-100 text-yellow-800", "Approved": "bg-blue-100 text-blue-800", "Paid": "bg-green-100 text-green-800", "Awaiting Info": "bg-orange-100 text-orange-800" }; return `<span class="inline-flex items-center ${colors[status]} text-xs font-bold uppercase px-2.5 py-1 rounded-sm">${status}</span>`; }
+        function getIcon(action) {
+             if(action.includes('created')) return `<svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+             if(action.includes('Corrected')) return `<svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z"></path><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd"></path></svg>`;
+             if(action.includes('Approved')) return `<svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zM9 12a1 1 0 112 0 1 1 0 01-2 0z" clip-rule="evenodd"></path></svg>`;
+             if(action.includes('Requested') || action.includes('Uploaded')) return `<svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.739 0 3.5 3.5 0 01-.369 6.98zM5 13a3.5 3.5 0 01-.738-6.938 4 4 0 117.938 0A3.5 3.5 0 015 13z"></path></svg>`;
+             return `<svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1zm2 8a1 1 0 001-1v-3a1 1 0 10-2 0v3a1 1 0 001 1z" clip-rule="evenodd"></path></svg>`;
+        }
+
+        // --- Modals & Panels Logic ---
+        const modal = document.getElementById('commission-modal');
+        const tridModal = document.getElementById('trid-modal');
+        const sourceDocView = document.getElementById('source-document-view');
+        const calculationView = document.getElementById('calculation-view');
+        const closeModalBtn = modal.querySelector('.close-modal');
+        const approveBtnContainer = document.getElementById('modal-actions');
+        const generateTridBtn = document.getElementById('generate-trid-btn');
+        const panel = document.getElementById('broker-panel'), overlay = document.getElementById('panel-overlay'), closePanelBtn = document.getElementById('close-panel-btn');
+        let currentEditingAgent = null;
+
+        function renderCalculation(deal, plan) {
+            const result = calculateCommission(deal, plan);
+            const formatCurrency = (val) => val.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+            calculationView.innerHTML = `
+                <div class="card p-4 space-y-4">
+                     <h4 class="text-xl font-black tracking-tighter">Deal <span class="text-charney-red">Inputs</span></h4>
+                     <div class="grid grid-cols-2 gap-4">
+                        <div><label class="form-label">Sale Price</label><input type="number" id="calc-sale-price" class="form-input" value="${deal.salePrice}"></div>
+                        <div><label class="form-label">Gross Commission (%)</label><input type="number" id="calc-gross-rate" class="form-input" value="${deal.grossCommissionRate}"></div>
+                        <div><label class="form-label">Referral Fee (%)</label><input type="number" id="calc-referral-fee" class="form-input" value="${deal.referralFeePct}"></div>
+                     </div>
+                </div>
+                <div class="card p-4 space-y-2">
+                    <h4 class="text-xl font-black tracking-tighter">Commission <span class="text-charney-red">Breakdown</span></h4>
+                    <table class="w-full text-sm">
+                        <tr><td class="py-1">Gross Commission Income (GCI)</td><td class="text-right py-1 font-bold">${formatCurrency(result.gci)}</td></tr>
+                        <tr class="text-charney-gray"><td class="py-1 pl-4">Referral Fee</td><td class="text-right py-1">(${formatCurrency(result.referralFee)})</td></tr>
+                        <tr class="text-charney-gray"><td class="py-1 pl-4">Franchise Fee (${plan.deductions.franchiseFeePct}%)</td><td class="text-right py-1">(${formatCurrency(result.franchiseFee)})</td></tr>
+                        <tr class="border-t border-charney-light-gray"><td class="py-1 font-bold">Adjusted GCI for Split</td><td class="text-right py-1 font-bold">${formatCurrency(result.adjustedGci)}</td></tr>
+                        
+                        <tr><td class="py-1 pt-4 font-bold">Agent Share (${result.agentSplit}%)</td><td class="text-right py-1 pt-4 font-bold">${formatCurrency(result.agentShare)}</td></tr>
+                        <tr class="text-charney-gray"><td class="py-1 pl-4">E&O Insurance Fee</td><td class="text-right py-1">(${formatCurrency(result.eoFee)})</td></tr>
+                        <tr class="text-charney-gray"><td class="py-1 pl-4">Transaction Fee</td><td class="text-right py-1">(${formatCurrency(result.transactionFee)})</td></tr>
+                        
+                        <tr class="border-t-2 border-charney-black"><td class="py-2 font-black text-lg">AGENT NET PAYOUT</td><td class="text-right py-2 font-black text-lg text-green-600">${formatCurrency(result.agentNet)}</td></tr>
+                        
+                        <tr class="border-t border-charney-light-gray"><td class="pt-4 pb-1 text-charney-gray">Brokerage Share (to Cap)</td><td class="text-right pt-4 pb-1 text-charney-gray">${formatCurrency(result.brokerageShareToCap)}</td></tr>
+                    </table>
+                </div>
+            `;
+            calculationView.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', () => {
+                    const updatedDeal = { ...deal };
+                    updatedDeal.salePrice = parseFloat(document.getElementById('calc-sale-price').value) || 0;
+                    updatedDeal.grossCommissionRate = parseFloat(document.getElementById('calc-gross-rate').value) || 0;
+                    updatedDeal.referralFeePct = parseFloat(document.getElementById('calc-referral-fee').value) || 0;
+                    renderCalculation(updatedDeal, plan);
+                });
+            });
+        }
+        
+        function openCommissionModal(data) {
+            let chainHTML = data.source.content.map(msg => `<div><p class="font-bold text-xs">${msg.from} &gt; ${msg.to}</p><div class="text-sm mt-1 p-2 bg-charney-cream rounded-md">${msg.body}</div></div>`).join('');
+            sourceDocView.innerHTML = `<h4 class="font-bold uppercase">Original Email Chain</h4><div class="bg-white border border-charney-light-gray rounded-md p-3 text-sm space-y-3">${chainHTML}</div>`;
+            const plan = agentPlans[data.broker];
+            renderCalculation(data, plan);
+            
+            generateTridBtn.classList.remove('hidden');
+            generateTridBtn.dataset.commissionId = data.id;
+            
+            approveBtnContainer.innerHTML = `<span id="approved-text" class="hidden text-green-600 font-bold text-sm mr-4">✓ Approved</span><button id="approve-btn" class="btn btn-primary">Approve</button>`;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function populateAndShowTrid(data) {
+            const today = new Date().toLocaleDateString('en-US');
+            tridModal.innerHTML = `
+                <div id="trid-form-printable" class="max-w-4xl mx-auto">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-3xl font-black uppercase tracking-tighter">Disclosure <span class="text-charney-red">Agreement</span></h2>
+                            <p class="text-charney-gray">This document outlines the terms and conditions of the commission agreement.</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold">Date Issued: ${today}</p>
+                            <p class="text-sm text-charney-gray">Property: ${data.parsedData.propertyAddress}</p>
+                            <p class="text-sm text-charney-gray">Transaction ID: ${data.id}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-8 mb-6">
+                        <div><h4 class="font-bold uppercase border-b-2 border-charney-black pb-1 mb-2">Transaction Information</h4><p><strong>Borrower:</strong> ${data.parsedData.buyerName}</p><p><strong>Seller:</strong> ${data.parsedData.sellerName}</p><p><strong>Lender:</strong> Charney Mortgage LLC</p></div>
+                        <div><h4 class="font-bold uppercase border-b-2 border-charney-black pb-1 mb-2">Loan Information</h4><p><strong>Loan Term:</strong> 30 years</p><p><strong>Purpose:</strong> Purchase</p><p><strong>Product:</strong> Fixed Rate</p><p><strong>Loan ID #:</strong> 89237492</p></div>
+                    </div>
+                    <div class="mb-6"><h4 class="font-bold uppercase border-b-2 border-charney-black pb-1 mb-2">Loan Terms</h4><div class="grid grid-cols-3 gap-4 text-sm"><div class="bg-charney-cream p-3 rounded-md"><p class="font-bold">Loan Amount</p><p class="text-lg">${data.parsedData.loanAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p></div><div class="bg-charney-cream p-3 rounded-md"><p class="font-bold">Interest Rate</p><p class="text-lg">6.25%</p></div><div class="bg-charney-cream p-3 rounded-md"><p class="font-bold">Monthly P&I</p><p class="text-lg">${(data.parsedData.loanAmount * 0.00616).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p></div></div></div>
+                    <div class="mb-6"><h4 class="font-bold uppercase border-b-2 border-charney-black pb-1 mb-2">Closing Cost Details</h4><table class="w-full text-sm"><tbody><tr><td class="py-2"><strong>A. Origination Charges</strong></td><td class="text-right py-2">${(data.salePrice * 0.01).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2 pl-4">01. 1% of Loan Amount (Points)</td><td class="text-right py-2">${(data.salePrice * 0.01).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2"><strong>C. Title & Escrow Charges</strong></td><td class="text-right py-2">$5,500.00</td></tr><tr><td class="py-2 pl-4">01. Closing Fee</td><td class="text-right py-2">$1,500.00</td></tr><tr><td class="py-2 pl-4">02. Title Insurance</td><td class="text-right py-2">$4,000.00</td></tr><tr class="font-bold border-t-2 border-charney-black"><td class="py-2"><strong>Total Closing Costs (J)</strong></td><td class="text-right py-2">${(data.salePrice * 0.01 + 5500).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr></tbody></table></div>
+                    <div class="mb-6"><h4 class="font-bold uppercase border-b-2 border-charney-black pb-1 mb-2">Summaries of Transactions</h4><div class="grid grid-cols-2 gap-8"><table class="w-full text-sm"><thead><tr><th class="text-left font-bold uppercase py-2">Borrower's Transaction</th><th class="text-right font-bold uppercase py-2"></th></tr></thead><tbody><tr><td class="py-2">K. Due from Borrower at Closing</td><td class="text-right py-2">${((data.salePrice * 0.2) + (data.salePrice * 0.01 + 5500)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2 pl-4">01. Sale Price of Property</td><td class="text-right py-2">${data.salePrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2 pl-4">02. Closing Costs Paid at Closing (J)</td><td class="text-right py-2">${(data.salePrice * 0.01 + 5500).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2">L. Paid Already by or on Behalf of Borrower</td><td class="text-right py-2">(${data.parsedData.loanAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</td></tr><tr><td class="py-2 pl-4">01. Loan Amount</td><td class="text-right py-2">(${data.parsedData.loanAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</td></tr><tr class="font-bold bg-charney-cream rounded-md"><td class="py-2 px-2">Cash to Close from Borrower</td><td class="text-right py-2 px-2">${((data.salePrice * 0.2) + (data.salePrice * 0.01 + 5500) - data.parsedData.loanAmount).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr></tbody></table><table class="w-full text-sm"><thead><tr><th class="text-left font-bold uppercase py-2">Seller's Transaction</th><th class="text-right font-bold uppercase py-2"></th></tr></thead><tbody><tr><td class="py-2">M. Due to Seller at Closing</td><td class="text-right py-2">${data.salePrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2 pl-4">01. Sale Price of Property</td><td class="text-right py-2">${data.salePrice.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr><tr><td class="py-2">N. Due from Seller at Closing</td><td class="text-right py-2">(${(data.parsedData.listingSideCommission + data.parsedData.sellerConcession).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</td></tr><tr><td class="py-2 pl-4">01. Listing Side Commission</td><td class="text-right py-2">(${(data.parsedData.listingSideCommission).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</td></tr><tr><td class="py-2 pl-4">02. Seller Concession</td><td class="text-right py-2">(${(data.parsedData.sellerConcession).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})</td></tr><tr class="font-bold bg-charney-cream rounded-md"><td class="py-2 px-2">Cash to Seller</td><td class="text-right py-2 px-2">${(data.salePrice - (data.parsedData.listingSideCommission + data.parsedData.sellerConcession)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td></tr></tbody></table></div></div>
+                    <div class="flex justify-between mt-8 pt-8 border-t border-charney-black"><p class="border-t border-charney-black pt-2 w-1/3">Borrower Signature</p><p class="border-t border-charney-black pt-2 w-1/3">Co-Borrower Signature</p></div></div>
+                </div>
+                <div class="no-print mt-8 text-center">
+                    <button id="close-trid-btn" class="btn btn-outline mr-4">Close</button>
+                    <button onclick="window.print()" class="btn btn-primary">Print Agreement</button>
+                </div>
+            `;
+            tridModal.classList.remove('hidden');
+            document.getElementById('close-trid-btn').addEventListener('click', () => {
+                tridModal.classList.add('hidden');
+            });
+        }
+
+        function openBrokerPanel(agentName) {
+            currentEditingAgent = agentName;
+            const agentData = mockData.find(d => d.broker === agentName);
+            const plan = agentPlans[agentName];
+
+            // Populate History
+            document.getElementById('panel-agent-name').textContent = agentName;
+            document.getElementById('panel-agent-email').textContent = agentData.email;
+            document.getElementById('panel-agent-email').href = `mailto:${agentData.email}`;
+            document.getElementById('panel-agent-score').textContent = agentData.score;
+            
+            const agentTransactions = mockData.filter(d => d.broker === agentName);
+            let historyHTML = agentTransactions.map(transaction => {
+                 const groupedLog = transaction.auditTrail.reduce((acc, item) => { acc[item.category] = acc[item.category] || []; acc[item.category].push(item); return acc; }, {});
+                 let categoriesHTML = Object.keys(groupedLog).map(category => {
+                     let itemsHTML = groupedLog[category].map(item => `<div class="flex items-start text-xs ml-5 mt-2"><div class="mr-2 mt-1">${getIcon(item.action)}</div><div><p>${item.action} by <strong>${item.actor}</strong></p><p class="opacity-60">${item.time}</p></div></div>`).join('');
+                     return `<div class="log-item expanded"><div class="log-header flex items-center cursor-pointer font-bold"><div class="arrow mr-2">&gt;</div>${category}</div><div class="log-body pl-4 border-l border-charney-light-gray ml-2">${itemsHTML}</div></div>`;
+                 }).join('');
+                 return `<div class="log-item expanded mt-4"><div class="log-header flex items-center cursor-pointer font-bold text-charney-red"><div class="arrow mr-2">&gt;</div>${transaction.property}</div><div class="log-body pl-4 border-l-2 border-charney-red ml-2">${categoriesHTML}</div></div>`;
+            }).join('');
+            const panelHistory = document.getElementById('panel-history');
+            panelHistory.innerHTML = historyHTML;
+            panelHistory.querySelectorAll('.log-header').forEach(header => header.addEventListener('click', () => header.parentElement.classList.toggle('expanded')));
+            
+            // Populate Plan
+            document.getElementById('agent-split').value = plan.primarySplit.agent;
+            document.getElementById('brokerage-split').value = plan.primarySplit.brokerage;
+            document.getElementById('commission-cap').value = plan.commissionCap;
+            document.getElementById('display-franchise-fee').textContent = plan.deductions.franchiseFeePct;
+            document.getElementById('display-eo-fee').textContent = plan.deductions.eoFee;
+            document.getElementById('display-transaction-fee').textContent = plan.deductions.transactionFee;
+            updateCapProgress(plan);
+
+            panel.classList.add('is-open');
+            overlay.classList.remove('hidden');
+        }
+
+        function updateCapProgress(plan) {
+            const progress = (plan.currentTowardsCap / plan.commissionCap) * 100;
+            document.getElementById('cap-progress-bar').style.width = `${progress}%`;
+            document.getElementById('cap-progress-text').textContent = `${plan.currentTowardsCap.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} / ${plan.commissionCap.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`;
+        }
+
+        function closePanel() { panel.classList.remove('is-open'); overlay.classList.add('hidden'); }
+        
+        // --- Event Listeners ---
+        document.querySelector('main').addEventListener('click', (e) => {
+            const agentNameCell = e.target.closest('[data-agent-name]');
+            const commissionRow = e.target.closest('.review-item');
+            const disclosureBtn = e.target.closest('.view-disclosure-btn');
+
+            if (disclosureBtn) {
+                const commissionId = disclosureBtn.dataset.commissionId;
+                const data = mockData.find(d => d.id === commissionId);
+                if (data) populateAndShowTrid(data);
+            } else if (agentNameCell) {
+                const agentName = agentNameCell.dataset.agentName;
+                openBrokerPanel(agentName);
+            } else if (commissionRow) {
+                const commissionId = commissionRow.dataset.commissionId;
+                const data = mockData.find(d => d.id === commissionId);
+                if (data) openCommissionModal(data);
+            }
+        });
+
+        closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+        closePanelBtn.addEventListener('click', closePanel);
+        overlay.addEventListener('click', closePanel);
+        
+        panel.querySelector('.panel-nav').addEventListener('click', e => {
+            if(e.target.tagName !== 'BUTTON') return;
+            const targetPanel = e.target.dataset.panel;
+            panel.querySelectorAll('.panel-nav-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            panel.querySelectorAll('.panel-content').forEach(content => content.classList.add('hidden'));
+            document.getElementById(`panel-${targetPanel}-content`).classList.remove('hidden');
+        });
+
+        document.getElementById('agent-split').addEventListener('input', e => {
+            document.getElementById('brokerage-split').value = 100 - parseInt(e.target.value, 10);
+        });
+        
+        document.getElementById('save-plan-btn').addEventListener('click', () => {
+             if (!currentEditingAgent) return;
+             const plan = agentPlans[currentEditingAgent];
+             plan.primarySplit.agent = parseInt(document.getElementById('agent-split').value, 10);
+             plan.primarySplit.brokerage = 100 - plan.primarySplit.agent;
+             plan.commissionCap = parseInt(document.getElementById('commission-cap').value, 10);
+             
+             // In a real app, you would save this to a database
+             const notification = document.getElementById('success-notification');
+             notification.textContent = `${currentEditingAgent}'s plan saved!`;
+             notification.classList.remove('hidden');
+             setTimeout(() => notification.classList.add('hidden'), 3000);
+             closePanel();
+        });
+
+        generateTridBtn.addEventListener('click', () => {
+            const commissionId = generateTridBtn.dataset.commissionId;
+            const data = mockData.find(d => d.id === commissionId);
+            if (!data) return;
+            modal.classList.add('hidden');
+            populateAndShowTrid(data);
+        });
+
+        approveBtnContainer.addEventListener('click', (e) => {
+            if (e.target.id === 'approve-btn') {
+                const commissionId = generateTridBtn.dataset.commissionId;
+                const row = document.querySelector(`tr.review-item[data-commission-id="${commissionId}"]`);
+                if (row) { row.querySelector('.status-cell').innerHTML = getStatusBadge('Approved'); }
+
+                e.target.textContent = 'Notify Agent';
+                e.target.id = 'notify-btn';
+                document.getElementById('approved-text').classList.remove('hidden');
+            } else if (e.target.id === 'notify-btn') {
+                modal.classList.add('hidden'); 
+                const notification = document.getElementById('success-notification');
+                notification.textContent = 'Notification sent!';
+                notification.classList.remove('hidden');
+                setTimeout(() => notification.classList.add('hidden'), 3000);
+            }
+        });
+        
+        // --- Stock Ticker & Alerts Logic ---
+        const mockStockData = [
+            { symbol: 'DJI', price: 34584.88, openPrice: 34584.88, change: 123.45, dir: 'up' },
+            { symbol: 'S&P 500', price: 4457.49, openPrice: 4457.49, change: -12.34, dir: 'down', alertThreshold: 0.5 },
+            { symbol: 'NASDAQ', price: 13748.83, openPrice: 13748.83, change: 8.90, dir: 'up' },
+            { symbol: 'MSFT', price: 329.81, openPrice: 329.81, change: 2.78, dir: 'up' },
+            { symbol: 'AAPL', price: 174.21, openPrice: 174.21, change: -2.56, dir: 'down' },
+            { symbol: 'GOOGL', price: 135.36, openPrice: 135.36, change: 1.12, dir: 'up' },
+            { symbol: 'AMZN', price: 137.85, openPrice: 137.85, change: -0.45, dir: 'down' },
+            { symbol: 'TSLA', price: 265.28, openPrice: 265.28, change: 5.67, dir: 'up' },
+        ];
+        function updateStockData() {
+            mockStockData.forEach(stock => {
+                let change;
+                // Occasionally create a large swing for the S&P 500 to trigger the alert
+                if (stock.alertThreshold && Math.random() > 0.8) {
+                    change = (Math.random() * stock.price * 0.03) - (stock.price * 0.015); // up to ~1.5% swing
+                } else {
+                    change = (Math.random() * stock.price * 0.01) - (stock.price * 0.005); // Normal smaller swing
+                }
+                stock.price += change;
+                stock.change = change;
+                stock.dir = change >= 0 ? 'up' : 'down';
+            });
+        }
+        function renderStockTicker() {
+            const track = document.getElementById('stock-ticker-track');
+            if (!track) return;
+            const content = [...mockStockData, ...mockStockData].map(stock => {
+                const arrow = stock.dir === 'up' ? '▲' : '▼';
+                const colorClass = stock.dir === 'up' ? 'ticker-up' : 'ticker-down';
+                return `<div class="ticker-item ${colorClass}">
+                            <span>${stock.symbol}</span>
+                            <span class="ml-2">${stock.price.toFixed(2)}</span>
+                            <span class="ml-2">${arrow} ${Math.abs(stock.change).toFixed(2)}</span>
+                        </div>`;
+            }).join('');
+            track.innerHTML = content;
+        }
+
+        function checkMarketAlerts() {
+            const alertsContainer = document.getElementById('market-alerts-container');
+            if (!alertsContainer) return;
+
+            alertsContainer.innerHTML = ''; // Clear old alerts
+
+            mockStockData.forEach(stock => {
+                if (!stock.alertThreshold) return;
+
+                const dailyChangePct = ((stock.price - stock.openPrice) / stock.openPrice) * 100;
+
+                if (Math.abs(dailyChangePct) > stock.alertThreshold) {
+                    const isDown = dailyChangePct < 0;
+                    const alertData = {
+                        title: "High Market Volatility Detected",
+                        message: `The ${stock.symbol} is ${isDown ? 'down' : 'up'} ${Math.abs(dailyChangePct).toFixed(1)}% today.`,
+                        impact: "Sudden market shifts can impact buyer confidence and loan approvals. Consider checking in with clients on active deals.",
+                        colorClass: "border-l-4 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20"
+                    };
+
+                    const alertHTML = `
+                        <div class="card market-alert p-4 ${alertData.colorClass}">
+                            <div class="flex justify-between items-start">
+                                 <div class="flex">
+                                    <div class="mr-3 flex-shrink-0">
+                                        <svg class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-black uppercase">${alertData.title}</h4>
+                                        <p class="text-sm font-bold mt-1">${alertData.message}</p>
+                                        <p class="text-xs text-charney-gray mt-2">${alertData.impact}</p>
+                                    </div>
+                                </div>
+                                <button class="close-alert-btn opacity-50 hover:opacity-100 text-2xl font-light leading-none -mt-2 -mr-1">&times;</button>
+                            </div>
+                        </div>
+                    `;
+                    alertsContainer.innerHTML += alertHTML;
+                }
+            });
+
+            alertsContainer.querySelectorAll('.close-alert-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const alertEl = e.target.closest('.market-alert');
+                    alertEl.style.opacity = '0';
+                    setTimeout(() => alertEl.remove(), 300);
+                });
+            });
+        }
+
+        function initStockTicker() {
+            renderStockTicker();
+            checkMarketAlerts();
+            setInterval(() => {
+                updateStockData();
+                renderStockTicker();
+                checkMarketAlerts();
+            }, 4000); 
+        }
+
+        // --- Init ---
+        renderTables();
+        setView('broker');
+        initStockTicker();
+    });
+    </script>
+</body>
+</html>
+
